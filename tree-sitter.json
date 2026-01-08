@@ -1,0 +1,42 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "silicon",
+      "camelcase": "Silicon",
+      "title": "Silicon",
+      "scope": "source.silicon",
+      "file-types": [
+        "silicon"
+      ],
+      "injection-regex": "^silicon$",
+      "class-name": "TreeSitterSilicon"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter parser for my language, silicon.",
+    "authors": [
+      {
+        "name": "Damien Wilson",
+        "email": "djwilson7704@gmail.com",
+        "url": ""
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/ThatOneDamien/tree-sitter-silicon.git",
+      "funding": ""
+    }
+  },
+  "bindings": {
+    "c": false,
+    "go": false,
+    "java": false,
+    "node": true,
+    "python": false,
+    "rust": false,
+    "swift": false,
+    "zig": false
+  }
+}
