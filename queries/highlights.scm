@@ -22,10 +22,9 @@
   ; "goto"
   ; "if"
   "import"
-  ; "module"
+  "mod"
   ; "nullptr"
-  ; "priv"
-  ; "pub"
+  (visibility_token)
   ; "return"
   ; "struct"
   ; "switch"
@@ -46,13 +45,71 @@
 [
   "("
   ")"
-  ; "["
-  ; "]"
+  "["
+  "]"
   "{"
   "}"
 ] @punctuation.bracket
 
+"..." @punctuation.special
+
+[
+  ; "="
+  ; "-"
+  "*"
+  ; "/"
+  ; "+"
+  ; "%"
+  ; "~"
+  ; "|"
+  ; "&"
+  ; "^"
+  ; "<<"
+  ; ">>"
+  ; ">>>"
+  "->"
+  ; "<->"
+  ; "<"
+  ; "<="
+  ; ">="
+  ; ">"
+  ; "=="
+  ; "!="
+  ; "!"
+  ; "&&"
+  ; "||"
+  ; "-="
+  ; "+="
+  ; "*="
+  ; "/="
+  ; "%="
+  ; "|="
+  ; "&="
+  ; "^="
+  ; ">>="
+  ; ">>>="
+  ; "<<="
+  ; "--"
+  ; "++"
+] @operator
+
+(primitive_type) @type.builtin
+
+(type_identifier) @type
+
+(number_literal) @number
+
+(boolean_literal) @boolean
+
+(nullptr) @constant.builtin
+
 (function_definition
   symbol: (identifier) @function)
+
+(function_signature
+  return_value: (identifier) @variable.parameter)
+
+(param_declaration
+  symbol: (identifier) @variable.parameter)
 
 (comment) @comment
