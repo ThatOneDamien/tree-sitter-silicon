@@ -5,6 +5,12 @@
 (member_identifier) @property
 
 [
+  "var"
+  "const"
+  "#const"
+] @keyword
+
+[
   ; "bitfield"
   "distinct"
   "enum"
@@ -44,8 +50,11 @@
 ([
   "#alignof"
   "#assert"
+  "#const"
   "#offsetof"
   "#sizeof"
+  "#type_max"
+  "#type_min"
   "#typeof"
   "#unreachable"
 ] @keyword.directive
@@ -56,10 +65,12 @@
   "#assert"
   "#offsetof"
   "#sizeof"
+  "#type_max"
+  "#type_min"
 ] @function.builtin
 
 [
-  ; "extern"
+  "extern"
   (visibility_token)
 ] @keyword.modifier
 
@@ -143,14 +154,15 @@
 
 (attribute) @attribute
 
+(label_identifier) @label
 
 (nullptr) @constant.builtin
 
 (function_definition
   name: (identifier) @function)
 
-(function_signature
-  return_value: (identifier) @variable.parameter)
+(call_expression
+  function: (identifier) @function)
 
 (param_declaration
   name: (identifier) @variable.parameter)

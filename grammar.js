@@ -31,10 +31,6 @@ const PREC = {
 export default grammar({
   name: "silicon",
 
-  conflicts: $ => [
-    [$.type, $.expression],
-  ],
-
   extras: $ => [
     /\s/,
     $.comment,
@@ -61,12 +57,14 @@ export default grammar({
 
     top_level: $ => seq(
       repeat($.attribute),
+      optional('extern'),
       optional($.visibility_token),
       choice(
         $.function_definition,
         $.import_statement,
         $.module_definition,
         $.struct_union_definition,
+        $.declaration_statement,
         $.enum_definition,
         $.typedef,
         $.ct_assert_statement,
@@ -122,14 +120,15 @@ export default grammar({
       choice('struct', 'union'),
       optional($._type_identifier),
       '{',
-      repeat($.struct_member),
+      commaSep($.struct_member),
+      optional(','),
       '}',
     ),
 
     struct_member: $ => seq(
+      $._member_identifier,
+      ':',
       $.type,
-      commaSep1($._member_identifier),
-      ';',
     ),
 
     enum_definition: $ => seq(
@@ -162,12 +161,12 @@ export default grammar({
       '(',
       commaSep(choice($.param_declaration, '...')),
       ')',
-      optional(seq('->', $.type, optional(field('return_value', $.identifier)))),
+      field('return_type', $.type,),
     ),
 
     param_declaration: $ => seq(
+      optional(seq(choice('_', field('name', $.identifier)), ':')),
       $.type,
-      optional(field('name', $.identifier)),
     ),
 
     statement: $ => choice(
@@ -180,6 +179,7 @@ export default grammar({
       $.return_statement,
       $.declaration_statement,
       $.expression_statement,
+      $.label_statement,
       $.ct_assert_statement,
       '#unreachable',
       ';',
@@ -250,13 +250,12 @@ export default grammar({
     ),
 
     declaration_statement: $ => seq(
-      $.type,
-      commaSep1(seq(
-        $.identifier,
-        optional(seq(
-          '=',
-          $.expression,
-        )),
+      choice('#const', 'const', 'var'),
+      field('name', $.identifier),
+      optional(seq(':', field('type', $.type))),
+      optional(seq(
+        '=',
+        choice($.expression, 'void'),
       )),
       ';'
     ),
@@ -268,6 +267,11 @@ export default grammar({
         $.expression,
       )),
       ';'
+    ),
+
+    label_statement: $ => seq(
+      $._label_identifier,
+      ':',
     ),
 
     ct_assert_statement: $ => seq(
@@ -291,9 +295,8 @@ export default grammar({
       $.member_access_expression,
       $.array_access_expression,
 
-      $.ct_alignof_expression,
+      $.ct_type_arg_expression,
       $.ct_offsetof_expression,
-      $.ct_sizeof_expression,
       $.string,
       $.boolean_literal,
       $.number_literal,
@@ -417,8 +420,8 @@ export default grammar({
       ']',
     )),
 
-    ct_alignof_expression: $ => prec(PREC.CT_EXPR, seq(
-      '#alignof',
+    ct_type_arg_expression: $ => prec(PREC.CT_EXPR, seq(
+      choice('#alignof', '#sizeof', '#type_max', '#type_min'),
       '(',
       field('type', $.type),
       ')'
@@ -433,14 +436,6 @@ export default grammar({
       ')'
     )),
 
-    ct_sizeof_expression: $ => prec(PREC.CT_EXPR, seq(
-      '#sizeof',
-      '(',
-      field('type', $.type),
-      ')'
-    )),
-
-
     parenthesized_expression: $ => seq(
       '(',
       $.expression,
@@ -448,13 +443,14 @@ export default grammar({
     ),
 
     type: $ => seq(
-      $._base_type,
       repeat($.type_modifier),
+      $._base_type,
     ),
 
     type_modifier: $ => choice(
       '*',
       seq('[', optional(choice('*', $.expression)), ']'),
+      'const',
     ),
 
     _base_type: $ => choice(
