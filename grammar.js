@@ -8,7 +8,8 @@
 // @ts-check
 const PREC = {
   PAREN: -10,
-  ASSIGN: -2,
+  ASSIGN: -3,
+  RANGE: -2,
   CONDITIONAL: -1,
   DEFAULT: 0,
   LOG_OR: 1,
@@ -51,14 +52,18 @@ export default grammar({
 
   word: $ => $.identifier,
 
+  conflicts: $ => [
+    [$.identifier_expression, $.struct_init_expression]
+  ],
+
   rules: {
     // TODO: add the actual grammar rules
     source_file: $ => repeat($.top_level),
 
     top_level: $ => seq(
       repeat($.attribute),
-      optional('extern'),
       optional($.visibility_token),
+      optional('extern'),
       choice(
         $.function_definition,
         $.import_statement,
@@ -80,6 +85,7 @@ export default grammar({
 
     function_definition: $ => seq(
       'fn',
+      optional(seq(field('method_type', $._type_identifier), '.')),
       field('name', $.identifier),
       $.function_signature,
       choice(';', $.compound_statement),
@@ -135,9 +141,16 @@ export default grammar({
       'enum',
       optional('distinct'),
       $._type_identifier,
+      optional(seq(':', $.type)),
       '{',
-      // $.enum_member,
+      commaSep($.enum_member),
+      optional(','),
       '}',
+    ),
+
+    enum_member: $ => seq(
+      field('member', $.identifier),
+      optional(seq('=', $.expression)),
     ),
 
     typedef: $ => seq(
@@ -145,10 +158,7 @@ export default grammar({
       optional('distinct'),
       $._type_identifier,
       '=',
-      choice(
-        $.type,
-        $.function_type,
-      ),
+      $.type,
       ';'
     ),
 
@@ -171,11 +181,13 @@ export default grammar({
 
     statement: $ => choice(
       $.compound_statement,
-      $.if_statement,
       $.switch_statement,
       $.while_statement,
+      $.if_statement,
+      $.for_statement,
       $.break_statement,
       $.continue_statement,
+      $.result_statement,
       $.return_statement,
       $.declaration_statement,
       $.expression_statement,
@@ -191,11 +203,19 @@ export default grammar({
       '}',
     ),
 
-    if_statement: $ => prec.right(seq(
+    if_statement: $ => prec.right(1, seq(
       'if',
       field('condition', $.expression),
       field('then', $.compound_statement),
-      optional(seq('else', field('else', $.compound_statement))),
+      optional(seq(
+        'else', 
+        field('else', 
+          choice(
+            $.compound_statement,
+            $.if_statement,
+          )
+        )
+      )),
     )),
 
     switch_statement: $ => seq(
@@ -231,6 +251,26 @@ export default grammar({
       field('body', $.compound_statement),
     ),
 
+    // TODO: This will be subject to change
+    for_statement: $ => seq(
+      'for',
+      field('loop_var', $.identifier),
+      'in',
+      field('range', $.expression),
+      field('body', $.compound_statement),
+    ),
+
+    result_statement_no_semi: $ => seq(
+      '=>',
+      $.expression,
+    ),
+
+    result_statement: $ => seq(
+      '=>',
+      $.expression,
+      ';'
+    ),
+
     return_statement: $ => seq(
       'return',
       optional($.expression),
@@ -255,7 +295,7 @@ export default grammar({
       optional(seq(':', field('type', $.type))),
       optional(seq(
         '=',
-        choice($.expression, 'void'),
+        choice($.expression, $.void_expression),
       )),
       ';'
     ),
@@ -284,7 +324,7 @@ export default grammar({
     ),
 
     expression: $ => choice(
-      $.conditional_expression,
+      $.if_expression,
       $.assignment_expression,
       $.binary_expression,
       $.unary_expression,
@@ -293,25 +333,40 @@ export default grammar({
       $.pointer_expression,
       $.call_expression,
       $.member_access_expression,
+      $.inferred_member_expression,
       $.array_access_expression,
-
+      $.array_init_expression,
+      $.struct_init_expression,
+      $.range_expression,
       $.ct_type_arg_expression,
+      $.ct_type_equal_expression,
       $.ct_offsetof_expression,
       $.string,
       $.boolean_literal,
       $.number_literal,
       $.char_literal,
-      $.nullptr,
+      $.null,
       $.parenthesized_expression,
-      $.identifier,
+      $.identifier_expression,
     ),
     
-    conditional_expression: $ => prec.right(PREC.CONDITIONAL, seq(
+    if_expression: $ => prec.right(seq(
+      'if',
       field('condition', $.expression),
-      '?',
-      optional(field('then', $.expression)),
-      ':',
-      field('else', $.expression),
+      field('then', choice(
+        $.compound_statement,
+        $.result_statement_no_semi
+      )),
+      seq(
+        'else', 
+        field('else', 
+          choice(
+            $.compound_statement,
+            $.if_statement,
+            $.result_statement_no_semi
+          )
+        )
+      ),
     )),
 
     assignment_expression: $ => prec.right(PREC.ASSIGN, seq(
@@ -380,7 +435,7 @@ export default grammar({
 
     postfix_expression: $ => prec.right(PREC.UNARY, seq(
       field('argument', $.expression),
-      field('operator', choice('++', '--')),
+      field('operator', choice('++', '--', '!')),
     )),
 
     cast_expression: $ => prec(PREC.CAST, seq(
@@ -407,23 +462,59 @@ export default grammar({
 
     member_access_expression: $ => seq(
       prec(PREC.MEMBER_ACCESS, seq(
-        field('argument', $.expression),
-        field('operator', choice('.', '->')),
+        field('parent', $.expression),
+        choice('.', '->'),
       )),
-      field('field', $._member_identifier),
+      field('member', $._member_identifier),
     ),
 
-    array_access_expression: $ => prec(PREC.ARRAY_ACCESS, seq(
+    inferred_member_expression: $ => seq(
+      '.',
+      field('member', $._member_identifier),
+    ),
+
+    array_access_expression: $ => prec.left(PREC.ARRAY_ACCESS, seq(
       field('argument', $.expression),
       '[',
       field('index', $.expression),
       ']',
     )),
 
+    array_init_expression: $ => seq(
+      '[',
+      commaSep(seq(optional(seq($.expression, ':')), $.expression)),
+      optional(','),
+      ']',
+    ),
+
+    struct_init_expression: $ => seq(
+      repeat(seq($._module_identifier, '::')),
+      $._type_identifier,
+      '{',
+      commaSep(seq($._member_identifier, ':', $.expression)),
+      optional(','),
+      '}',
+    ),
+
+    range_expression: $ => prec.right(PREC.RANGE, seq(
+      field('start', $.expression),
+      '..',
+      field('end', $.expression),
+    )),
+
     ct_type_arg_expression: $ => prec(PREC.CT_EXPR, seq(
       choice('#alignof', '#sizeof', '#type_max', '#type_min'),
       '(',
       field('type', $.type),
+      ')'
+    )),
+
+    ct_type_equal_expression: $ => prec(PREC.CT_EXPR, seq(
+      '#type_equal',
+      '(',
+      field('first', $.type),
+      ',',
+      field('second', $.type),
       ')'
     )),
 
@@ -442,6 +533,13 @@ export default grammar({
       ')',
     ),
 
+    identifier_expression: $ => seq(
+      repeat(seq($._module_identifier, '::')),
+      $.identifier
+    ),
+
+    void_expression: _ => token('void'),
+
     type: $ => seq(
       repeat($.type_modifier),
       $._base_type,
@@ -450,17 +548,18 @@ export default grammar({
     type_modifier: $ => choice(
       '*',
       seq('[', optional(choice('*', $.expression)), ']'),
+      '?',
       'const',
     ),
 
     _base_type: $ => choice(
       $.primitive_type,
-      $.auto_type,
       $.typeof_type,
       seq(
         repeat(seq($._module_identifier, '::')),
         $._type_identifier,
       ),
+      $.function_type,
     ),
 
     primitive_type: _ => token(choice(
@@ -483,8 +582,6 @@ export default grammar({
       'uptr',
     )),
 
-    auto_type: _ => token('auto'),
-
     typeof_type: $ => seq(
       '#typeof',
       '(',
@@ -506,7 +603,7 @@ export default grammar({
               seq(/0[bo]/, decimalDigits),
               seq('0x', hexDigits),
             ),
-            optional(seq('.', optional(hexDigits))),
+            optional(seq('.', hexDigits)),
           ),
           seq('.', decimalDigits),
         ),
@@ -521,8 +618,9 @@ export default grammar({
       ));
     },
 
-    string: $ => repeat1(
-      $.string_literal
+    string: $ => choice(
+      repeat1($.string_literal),
+      $.raw_string_literal,
     ),
 
     string_literal: $ => seq(
@@ -534,8 +632,14 @@ export default grammar({
       '"',
     ),
 
+    raw_string_literal: $ => seq(
+      '`',
+      repeat(token.immediate(prec(1, /[^`]+/))),
+      '`',
+    ),
+
     char_literal: $ => seq(
-      '\'',
+      choice('u\'', 'U\'', '\''),
       repeat1(choice(
         $.escape_sequence,
         token.immediate(/[^\n']/),
@@ -563,9 +667,10 @@ export default grammar({
 
     visibility_token: _ => token(choice('priv', 'pub')),
     boolean_literal: _ => token(choice('true', 'false')),
-    nullptr: _ => token('nullptr'),
+    null: _ => token('null'),
 
     identifier: _ => /[_A-Za-z][_0-9A-Za-z]*/,
+    enum_value_ident: _ => /[A-Z][_0-9A-Za-z]*/,
 
     comment: _ => token(choice(
       seq('//', /(\\+(.|\r?\n)|[^\\\n])*/),

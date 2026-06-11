@@ -22,7 +22,8 @@
 [
   "break"
   "continue"
-  ; "for"
+  "for"
+  "in"
   "while"
 ] @keyword.repeat
 
@@ -53,6 +54,7 @@
   "#const"
   "#offsetof"
   "#sizeof"
+  "#type_equal"
   "#type_max"
   "#type_min"
   "#typeof"
@@ -65,6 +67,7 @@
   "#assert"
   "#offsetof"
   "#sizeof"
+  "#type_equal"
   "#type_max"
   "#type_min"
 ] @function.builtin
@@ -81,6 +84,7 @@
   ","
   "."
   "::"
+  ".."
 ] @punctuation.delimiter
 
 [
@@ -109,6 +113,7 @@
   ">>"
   ">>>"
   "->"
+  "=>"
   "<->"
   "<"
   "<="
@@ -117,6 +122,7 @@
   "=="
   "!="
   "!"
+  "?"
   "&&"
   "||"
   "-="
@@ -141,13 +147,16 @@
   ] @punctuation.bracket
   (#set! priority 105))
 
-(primitive_type) @type.builtin
-(auto_type) @type.builtin
+[
+  (primitive_type)
+  (void_expression)
+] @type.builtin
 
 (type_identifier) @type
 
 (escape_sequence) @string.escape
 (string_literal) @string
+(raw_string_literal) @string
 (number_literal) @number
 (char_literal) @character
 (boolean_literal) @boolean
@@ -156,13 +165,30 @@
 
 (label_identifier) @label
 
-(nullptr) @constant.builtin
+(null) @constant.builtin
+
+(enum_member
+  member: (identifier) @constant)
+
+(member_access_expression
+  parent: (identifier_expression
+            (identifier) @type)
+  member: (member_identifier) @constant
+  (#match? @constant "^[A-Z]"))
+
+(inferred_member_expression
+  member: (member_identifier) @constant)
 
 (function_definition
   name: (identifier) @function)
 
 (call_expression
-  function: (identifier) @function)
+  function: (identifier_expression 
+              (identifier) @function))
+
+(call_expression
+  function: (member_access_expression
+              member: (member_identifier) @function))
 
 (param_declaration
   name: (identifier) @variable.parameter)
